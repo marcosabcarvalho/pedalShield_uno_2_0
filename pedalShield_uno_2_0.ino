@@ -41,7 +41,7 @@ int pulseCount = 0;                                                            /
 int read_counter = 0;                                                          // Interrupt read counter
 int ocr_counter = 0;                                                           // Output compare register counter
 int input, vol_variable = 512;                                                 // Signal from instrument
-int dist_variable = 250;                                                        // Effect ammount?
+int dist_variable = 250;                                                       // Effect ammount?
 String normalized_output;                                                      // Map output display to a 0-100 scale
 byte ADC_low, ADC_high;                                                        // Analogue to Digital Converter low and high bytes
 FastMap mapper;
@@ -120,6 +120,8 @@ void loop() {
     digitalWrite(LED, HIGH);
     // Read Rotary Encoder Push Button
     btn.read();
+    SIG_A = digitalRead(Pin_A);  //read state of A
+    SIG_B = digitalRead(Pin_B);  //read state of B
   } else {
     digitalWrite(LED, LOW);
   }
