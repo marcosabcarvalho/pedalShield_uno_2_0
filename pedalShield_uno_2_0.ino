@@ -12,6 +12,7 @@
 
 #include <BfButton.h>
 #include <U8glib.h>
+#include "FastMap.h"
 
 // defining harware resources.
 int LED = 13;
@@ -43,6 +44,7 @@ int input, vol_variable = 512;                                                 /
 int dist_variable = 10;                                                        // Effect ammount?
 String normalized_output;                                                      // Map output display to a 0-100 scale
 byte ADC_low, ADC_high;                                                        // Analogue to Digital Converter low and high bytes
+FastMap mapper;
 
 //Button press hanlding function
 void pressHandler(BfButton* btn, BfButton::press_pattern_t pattern) {
@@ -127,15 +129,15 @@ void loop() {
     draw(bank_names[bank - 1].c_str(), 0, 8);
     switch (bank) {
       case (1):
+        mapper.init(0, 1024, long(0), long(100));
         draw("VOLUME:", 0, 30);
-        //normalized_output = String(map(vol_variable, 0, 1024, 0, 100)); // SLOW!!!!
-        normalized_output = String(vol_variable);
+        normalized_output = String(mapper.map(float(vol_variable)));
         break;
 
       case (2):
+        mapper.init(0, 500, long(0), long(100));
         draw("EFFECT:", 0, 30);
-        //normalized_output = String(map(dist_variable, 0, 500, 0, 100)); // SLOW!!!!
-        normalized_output = String(dist_variable);
+        normalized_output = String(mapper.map(float(dist_variable)));
         break;
 
       default:
