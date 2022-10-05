@@ -41,7 +41,7 @@ int pulseCount = 0;                                                            /
 int read_counter = 0;                                                          // Interrupt read counter
 int ocr_counter = 0;                                                           // Output compare register counter
 int input, vol_variable = 512;                                                 // Signal from instrument
-int dist_variable = 10;                                                        // Effect ammount?
+int dist_variable = 250;                                                        // Effect ammount?
 String normalized_output;                                                      // Map output display to a 0-100 scale
 byte ADC_low, ADC_high;                                                        // Analogue to Digital Converter low and high bytes
 FastMap mapper;
@@ -60,7 +60,7 @@ void pressHandler(BfButton* btn, BfButton::press_pattern_t pattern) {
           break;
 
         case (2):
-          dist_variable = 10;
+          dist_variable = 250;
           break;
       }
       break;
@@ -158,6 +158,7 @@ ISR(TIMER1_CAPT_vect) {
   if (read_counter == 100) {  // do work every 100 reads.
     read_counter = 0;
     // Check the rotary encoder for values
+    btn.read();
     SIG_A = digitalRead(Pin_A);  //read state of A
     SIG_B = digitalRead(Pin_B);  //read state of B
 
