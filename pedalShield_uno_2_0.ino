@@ -32,23 +32,27 @@ FastMap mapper;                                                  // map() is slo
 #define PWM_QTY 2        // 2 PWMs in parallel
 
 // other variables
-int SIG_A = 0;                                                                 // pin A output
-int SIG_B = 0;                                                                 // pin B output
-int lastSIG_A = 0;                                                             // last state of SIG_A
-int lastSIG_B = 0;                                                             // last state of SIG_B
-int bank = 1;                                                                  // Initial effect bank
-int bank_max = 3;                                                              // Max number of effect banks
-String bank_names[] = { "C L E A N", "O C T A V E R", "E M P T Y  B A N K" };  // Effect Names
-int pulseCount = 0;                                                            // Rotary pulses
-int read_counter = 0;                                                          // Interrupt read counter
-int ocr_counter = 0;                                                           // Output compare register counter
-int input;                                                                     // Signal from instrument
-int vol_variable = 512;                                                        // Volume
-int dist_variable = 250;                                                       // Effect ammount?
-String normalized_output;                                                      // Map output display to a 0-100 scale
-byte ADC_low, ADC_high;                                                        // Analogue to Digital Converter low and high bytes
+int SIG_A = 0;                        // pin A output
+int SIG_B = 0;                        // pin B output
+int lastSIG_A = 0;                    // last state of SIG_A
+int lastSIG_B = 0;                    // last state of SIG_B
+int pulseCount = 0;                   // Rotary pulses
+int read_counter = 0;                 // Interrupt read counter
+int ocr_counter = 0;                  // Output compare register counter
+int input;                            // Signal from instrument
+int vol_variable = 512;               // Volume
+int dist_variable = 250;              // Effect ammount?
+int distortion_threshold = 16384;      // distortion threshold
+String normalized_output;             // Map output display to a 0-100 scale
+byte ADC_low, ADC_high;               // Analogue to Digital Converter low and high bytes
+int bank = 1;                         // Initial effect bank
+int bank_max = 4;                     // Max number of effect banks
+String bank_names[] = { "C L E A N",  // Effect Names
+                        "O C T A V E R",
+                        "D I S T O R T I O N",
+                        "E M P T Y  B A N K" };
 
-//Button press hanlding function
+// Button press hanlding function
 void pressHandler(BfButton* btn, BfButton::press_pattern_t pattern) {
   switch (pattern) {
     case BfButton::SINGLE_PRESS:  // Bank Scroll
@@ -64,6 +68,10 @@ void pressHandler(BfButton* btn, BfButton::press_pattern_t pattern) {
         case (2):
           dist_variable = 250;
           break;
+
+        case (3):
+          distortion_threshold = 16384;
+          break;
       }
       break;
 
@@ -76,6 +84,10 @@ void pressHandler(BfButton* btn, BfButton::press_pattern_t pattern) {
         case (2):
           dist_variable = 500;
           break;
+
+        case (3):
+          distortion_threshold = 32767;
+          break;
       }
       break;
   }
@@ -87,7 +99,6 @@ void setup() {
 
   // Setup display
   u8g.setColorIndex(1);
-  u8g.setFont(u8g_font_profont12);
 
   // Setup initial state of rotary encoder
   SIG_B = digitalRead(Pin_B);  //current state of encoder pin B
@@ -128,32 +139,41 @@ void loop() {
     SIG_A = digitalRead(Pin_A);  //read state of A
     SIG_B = digitalRead(Pin_B);  //read state of B
 
-
     u8g.firstPage();
     do {
-      draw(bank_names[bank - 1].c_str(), 0, 8);
+      u8g.setFont(u8g_font_profont12r);
+      draw(bank_names[bank - 1].c_str(), 0, 12);
       switch (bank) {
         case (1):
+          u8g.setFont(u8g_font_profont29);
           mapper.init(0, 1024, long(0), long(100));
-          draw("VOLUME:", 0, 30);
+          draw("VOLUME", 0, 35);
           normalized_output = String(mapper.map(float(vol_variable)));
           break;
 
         case (2):
+          u8g.setFont(u8g_font_profont29);
           mapper.init(0, 500, long(0), long(100));
-          draw("EFFECT:", 0, 30);
+          draw("AMOUNT", 0, 35);
           normalized_output = String(mapper.map(float(dist_variable)));
+          break;
+
+        case (3):
+          u8g.setFont(u8g_font_profont29);
+          mapper.init(0, 32767, long(0), long(100));
+          draw("AMOUNT", 0, 35);
+          normalized_output = String(mapper.map(float(distortion_threshold)));
           break;
 
         default:
           normalized_output = "";
       }
 
-      draw(normalized_output.c_str(), 80, 30);
+      draw(normalized_output.c_str(), 0, 57);
     } while (u8g.nextPage());
     // nothing else here, all happens in the TIMER1_CAPT_vect interruption.
   } else {
-    digitalWrite(LED, LOW); // --STOMP :(
+    digitalWrite(LED, LOW);  // --STOMP :(
   }
 }
 
@@ -215,7 +235,7 @@ ISR(TIMER1_CAPT_vect) {
           } else if (!(SIG_B != SIG_A) && (lastSIG_B == SIG_B)) {
             pulseCount++;                              //clockwise rotation
             if (dist_variable < 500) dist_variable++;  //clockwise rotation
-            lastSIG_B = SIG_B > 0 ? 0 : 1;             //save last state of B
+            lastSIG_B = SIG_B > 0 ? 0 : 1;
           }
           ocr_counter++;
           if (ocr_counter >= dist_variable) {
@@ -233,8 +253,37 @@ ISR(TIMER1_CAPT_vect) {
           }
           break;
 
-        /* E M P T Y */
+        /* D I S T O R T I O N */
         case (3):
+
+          // get ADC data
+          ADC_low = ADCL;  // low byte first
+          ADC_high = ADCH;
+
+          //construct the input summing the ADC low and high byte.
+          input = ((ADC_high << 8) | ADC_low) + 0x8000;  // make a signed 16b value
+
+          if (!(SIG_B == SIG_A) && (lastSIG_B != SIG_B)) {
+            pulseCount--;                                                                     // anti-clockwise rotation
+            if (distortion_threshold > 0) distortion_threshold = distortion_threshold - 100;  // decrease the vol
+            lastSIG_B = SIG_B;                                                                // save last state of B
+          } else if (!(SIG_B != SIG_A) && (lastSIG_B == SIG_B)) {
+            pulseCount++;                                                                         // clockwise rotation
+            if (distortion_threshold < 32767) distortion_threshold = distortion_threshold + 100;  // increase the vol
+            lastSIG_B = SIG_B > 0 ? 0 : 1;
+          }
+
+          // the input signal is 16bits (values from -32768 to +32767)
+          // the value of input is clipped to the distortion_threshold value
+          if (input > distortion_threshold) input = distortion_threshold;
+
+          //write the PWM signal
+          OCR1AL = ((input + 0x8000) >> 8);  // convert to unsigned, send out high byte
+          OCR1BL = input;                    // send out low byte
+          break;
+
+          /* E M P T Y */
+        case (4):
           break;
 
         /***********/
