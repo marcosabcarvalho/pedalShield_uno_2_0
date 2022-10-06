@@ -17,12 +17,14 @@
 // defining harware resources.
 int LED = 13;
 int FOOTSWITCH = 12;
-int Pin_BTN = 3;  // GPIO #3-Push button on encoder
-int Pin_A = 4;    // GPIO #4-Pin_A on encoder (Output A)
-int Pin_B = 2;    // GPIO #5-Pin_B on encoder (Output B)
+int Pin_BTN = 3;  // Push button on encoder
+int Pin_A = 4;    // Output A
+int Pin_B = 2;    // Output B
 
-BfButton btn(BfButton::STANDALONE_DIGITAL, Pin_BTN, true, LOW);
-U8GLIB_SSD1306_128X64 u8g(U8G_I2C_OPT_NONE);  // I2C / TWI
+// Initialize libraries
+BfButton btn(BfButton::STANDALONE_DIGITAL, Pin_BTN, true, LOW);  // Push button event listener
+U8GLIB_SSD1306_128X64 u8g(U8G_I2C_OPT_NONE);                     // Setup Display
+FastMap mapper;                                                  // map() is slow af
 
 //defining the output PWM parameters
 #define PWM_FREQ 0x00FF  // pwm frequency - 31.3KHz
@@ -45,7 +47,6 @@ int vol_variable = 512;                                                        /
 int dist_variable = 250;                                                       // Effect ammount?
 String normalized_output;                                                      // Map output display to a 0-100 scale
 byte ADC_low, ADC_high;                                                        // Analogue to Digital Converter low and high bytes
-FastMap mapper;                                                                // map() is slow af
 
 //Button press hanlding function
 void pressHandler(BfButton* btn, BfButton::press_pattern_t pattern) {
@@ -107,19 +108,18 @@ void setup() {
   TCCR1A = (((PWM_QTY - 1) << 5) | 0x80 | (PWM_MODE << 1));  //
   TCCR1B = ((PWM_MODE << 3) | 0x11);                         // ck/1
   TIMSK1 = 0x20;                                             // interrupt on capture interrupt
-  ICR1H = (PWM_FREQ >> 8);
-  ICR1L = (PWM_FREQ & 0xff);
-  DDRB |= ((PWM_QTY << 1) | 0x02);  // turn on outputs
-                                    // turn on interrupts - not really necessary with arduino
+  ICR1H = (PWM_FREQ >> 8);                                   //
+  ICR1L = (PWM_FREQ & 0xff);                                 //
+  DDRB |= ((PWM_QTY << 1) | 0x02);                           // turn on outputs
+                                                             // turn on interrupts - not really necessary with arduino
   // Excuse me!
   sei();
 }
 
 void loop() {
-  // Turn on the LED if the effect is ON.
-  if (digitalRead(FOOTSWITCH)) {  // STOMP
 
-    digitalWrite(LED, HIGH);
+  if (digitalRead(FOOTSWITCH)) {  // STOMP++ :)
+    digitalWrite(LED, HIGH);      // Turn on the LED if the effect is ON.
 
     // Read Rotary Encoder Push Button
     btn.read();
@@ -153,7 +153,7 @@ void loop() {
     } while (u8g.nextPage());
     // nothing else here, all happens in the TIMER1_CAPT_vect interruption.
   } else {
-    digitalWrite(LED, LOW);
+    digitalWrite(LED, LOW); // --STOMP :(
   }
 }
 
@@ -163,8 +163,8 @@ void draw(char* str, int posx, int posy) {
 
 ISR(TIMER1_CAPT_vect) {
   if (digitalRead(FOOTSWITCH)) {  // STOMP
-    read_counter++;
-    if (read_counter == 100) {  // do work every 100 reads.
+    read_counter++;               //
+    if (read_counter == 100) {    // do work every 100 reads.
       read_counter = 0;
       // Read Rotary Encoder Push Button
       btn.read();
@@ -182,7 +182,7 @@ ISR(TIMER1_CAPT_vect) {
           // get ADC data
           ADC_low = ADCL;  // low byte first
           ADC_high = ADCH;
-          
+
           //construct the input summing the ADC low and high byte.
           input = ((ADC_high << 8) | ADC_low) + 0x8000;  // make a signed 16b value
 
@@ -191,9 +191,9 @@ ISR(TIMER1_CAPT_vect) {
             if (vol_variable > 0) vol_variable--;  //anti-clockwise rotation
             lastSIG_B = SIG_B;
           } else if (!(SIG_B != SIG_A) && (lastSIG_B == SIG_B)) {
-            pulseCount++;                             //clockwise rotation
-            if (vol_variable < 1024) vol_variable++;  
-            lastSIG_B = SIG_B > 0 ? 0 : 1;            //save last state of B
+            pulseCount++;  //clockwise rotation
+            if (vol_variable < 1024) vol_variable++;
+            lastSIG_B = SIG_B > 0 ? 0 : 1;  //save last state of B
           }
 
           //the amplitude of the signal is modified following the vol_variable using the Arduino map fucntion
