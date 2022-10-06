@@ -42,7 +42,7 @@ int ocr_counter = 0;                  // Output compare register counter
 int input;                            // Signal from instrument
 int vol_variable = 512;               // Volume
 int dist_variable = 250;              // Effect ammount?
-int distortion_threshold = 16384;      // distortion threshold
+int distortion_threshold = 16384;     // distortion threshold
 String normalized_output;             // Map output display to a 0-100 scale
 byte ADC_low, ADC_high;               // Analogue to Digital Converter low and high bytes
 int bank = 1;                         // Initial effect bank
